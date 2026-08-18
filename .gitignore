@@ -1,0 +1,11 @@
+/shorty_app
+/shorty
+*.so
+
+.env
+*.local
+
+*.log
+
+*.test
+*.prof
