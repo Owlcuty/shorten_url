@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"shorty/internal/configuration"
 	"shorty/internal/repository"
 	"testing"
 	"time"
@@ -16,19 +17,23 @@ func prepareClient(t *testing.T, ctx context.Context) *connection {
 	dbName := "db"
 	username := "user"
 	password := "pass"
-	address := "localhost:5432"
-	cfg := &repository.Credentials{
-		Address:  address,
-		User:     username,
-		Password: password,
+	address := "localhost"
+	port := "5432"
+	cfg := &configuration.DatabaseConfig{
+		Type:         "postgres",
+		Address:      address,
+		User:         username,
+		Password:     password,
+		Port:         port,
+		DatabaseName: dbName,
 	}
 	postgCont, err := contpostgres.Run(
 		ctx, "postgres:latest",
-		contpostgres.WithDatabase("db"),
-		contpostgres.WithUsername("user"),
-		contpostgres.WithPassword("pass"),
+		contpostgres.WithDatabase(dbName),
+		contpostgres.WithUsername(username),
+		contpostgres.WithPassword(password),
 		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(20*time.Second),
+			wait.ForListeningPort(port+"/tcp").WithStartupTimeout(20*time.Second),
 			wait.ForLog("database system is ready to accept connections"),
 		),
 	)
@@ -39,10 +44,10 @@ func prepareClient(t *testing.T, ctx context.Context) *connection {
 	require.NoError(t, err)
 	connPort, err := postgCont.MappedPort(ctx, "5432")
 	require.NoError(t, err)
-	cfg.Address = address[:len(address)-4] + connPort.Port()
-	require.Equal(t, connStr, buildConnectionStr(cfg, dbName))
+	cfg.Port = connPort.Port()
+	require.Equal(t, connStr, buildConnectionStr(cfg))
 
-	client, err := NewConnection(ctx, cfg, "db", 500*time.Millisecond)
+	client, err := NewConnection(ctx, cfg, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	err = CreateBaseIfNotExist(ctx, client)

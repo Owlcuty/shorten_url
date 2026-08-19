@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"log"
-	"shorty/internal/delivery/http"
+	"net/http"
+	"shorty/internal/configuration"
+	"shorty/internal/delivery"
 	"shorty/internal/domain"
-	"shorty/internal/repository"
 	"shorty/internal/repository/postgres"
 	"shorty/internal/repository/redis"
 	"shorty/internal/service"
@@ -13,9 +16,45 @@ import (
 	"time"
 )
 
-func preparePostgresDB(ctx context.Context, cfg *repository.Credentials, cleanupPeriod time.Duration) domain.URLRepository {
+func prepareCacheByConfig(ctx context.Context, cfg *configuration.CacheConfig) domain.URLRepository {
+	switch cfg.Type {
+	case "redis":
+		return prepareRedisCache(ctx, cfg)
+	default:
+		return nil
+	}
+}
+
+func prepareDBByConfig(ctx context.Context, cfg *configuration.DatabaseConfig) domain.URLRepository {
+	switch cfg.Type {
+	case "postgres":
+		return preparePostgresDB(ctx, cfg, time.Hour)
+	default:
+		return nil
+	}
+}
+
+func prepareHasherConfig(cfg *configuration.HasherConfig) domain.Hasher {
+	var generator domain.Generator
+	var encoder domain.Encoder
+	switch cfg.Generator {
+	case "murmur":
+		generator = hash.NewMurmur()
+	default:
+		generator = hash.NewMurmur()
+	}
+	switch cfg.Encoder {
+	case "base62":
+		encoder = hash.NewBase62Hash()
+	default:
+		encoder = hash.NewBase62Hash()
+	}
+	return hash.NewURLHasher(generator, encoder)
+}
+
+func preparePostgresDB(ctx context.Context, cfg *configuration.DatabaseConfig, cleanupPeriod time.Duration) domain.URLRepository {
 	log.Printf("preparePostgresDB for %s", cfg.Address)
-	db, err := postgres.NewConnection(ctx, cfg, "shorty_db", cleanupPeriod)
+	db, err := postgres.NewConnection(ctx, cfg, cleanupPeriod)
 	if err != nil {
 		log.Fatalf("failed to start postgres connection: %v", err)
 	}
@@ -23,7 +62,7 @@ func preparePostgresDB(ctx context.Context, cfg *repository.Credentials, cleanup
 	return db
 }
 
-func prepareRedisCache(ctx context.Context, cfg *repository.Credentials) domain.URLRepository {
+func prepareRedisCache(ctx context.Context, cfg *configuration.CacheConfig) domain.URLRepository {
 	cache, err := redis.NewRedisClient(ctx, cfg)
 	if err != nil {
 		log.Fatalf("failed to start new redis client: %v", err)
@@ -40,34 +79,36 @@ func prepareService(db domain.URLRepository, cache domain.URLRepository, hasher 
 	return service.New(tools)
 }
 
+var confPath = flag.String("c", "", "Path to configuration file")
+
 func main() {
 	ctx := context.Background()
-	redisCfg := &repository.Credentials{Address: "localhost:6379"}
-	postgresCfg := &repository.Credentials{
-		Address:  "localhost:5433",
-		User:     "shorty_user",
-		Password: "shorty_pass",
+
+	flag.Parse()
+	config, err := configuration.ParseFile(*confPath)
+	if err != nil {
+		log.Fatalf("failed to open configuration file, its essential (filename: %s): %v", *confPath, err)
 	}
 
-	generator := hash.NewMurmur()
-	encoder := hash.NewBase62Hash()
-	hasher := hash.NewURLHasher(generator, encoder)
+	hasher := prepareHasherConfig(&config.Hasher)
 
-	db := preparePostgresDB(ctx, postgresCfg, time.Hour)
+	db := prepareDBByConfig(ctx, &config.Repo.DB)
 	if db != nil {
 		defer db.Close()
 	}
 
-	cache := prepareRedisCache(ctx, redisCfg)
+	cache := prepareCacheByConfig(ctx, &config.Repo.Cache)
 	if cache != nil {
 		defer cache.Close()
 	}
 
 	serv := prepareService(db, cache, hasher)
 	go serv.Run(ctx)
+	defer serv.Stop()
 
-	server := http.NewServer(serv)
-	server.Listen()
-
-	serv.Stop()
+	server := delivery.NewServer(serv, &config.Http)
+	err = server.Listen()
+	if !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("failed listen server: %v", err)
+	}
 }

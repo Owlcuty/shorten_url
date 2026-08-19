@@ -3,8 +3,8 @@ package redis
 import (
 	"context"
 	"fmt"
+	"shorty/internal/configuration"
 	"shorty/internal/domain"
-	"shorty/internal/repository"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
@@ -14,12 +14,15 @@ type RedisCache struct {
 	client *redis.Client
 }
 
-func NewRedisClient(ctx context.Context, cfg *repository.Credentials) (*RedisCache, error) {
+func NewRedisClient(ctx context.Context, cfg *configuration.CacheConfig) (*RedisCache, error) {
+	endpoint := cfg.Address
+	if cfg.Port != "" {
+		endpoint += ":" + cfg.Port
+	}
 	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Address,
+		Addr:     endpoint,
 		Username: cfg.User,
 		Password: cfg.Password,
-		DB:       cfg.DB,
 	})
 
 	err := client.Ping(ctx).Err()

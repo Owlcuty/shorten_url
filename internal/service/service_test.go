@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"shorty/internal/configuration"
 	"shorty/internal/domain"
-	"shorty/internal/repository"
 	"shorty/internal/repository/redis"
 	"shorty/internal/service/hash"
 	"sync"
@@ -60,9 +60,8 @@ func runRedisClient(t *testing.T, ctx context.Context) (*redis.RedisCache, error
 		t.Error(err)
 	}
 
-	return redis.NewRedisClient(ctx, &repository.Credentials{
+	return redis.NewRedisClient(ctx, &configuration.CacheConfig{
 		Address: endpoint,
-		DB:      0,
 	})
 }
 

@@ -1,4 +1,4 @@
-package http
+package delivery
 
 import (
 	"bytes"
@@ -6,11 +6,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"shorty/internal/configuration"
 	"shorty/internal/domain"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+var config = &configuration.HttpConfig{
+	Address: "localhost",
+	Port:    "5433",
+	API: configuration.APIConfig{
+		Shorten: "/api/v1/shorten",
+		Resolve: "/r",
+		Stat:    "/api/v1/stats",
+	},
+}
+
+var endpoint = config.Address + ":" + config.Port
 
 type mockService struct {
 	getRunFunc     func(ctx context.Context)
@@ -41,11 +54,6 @@ func (m *mockService) GetLink(ctx context.Context, hash string) (string, error) 
 }
 
 func (m *mockService) Stop() {}
-
-func listener(s *server) {
-	s.Listen()
-
-}
 
 func prepareService() *mockService {
 	return &mockService{
@@ -78,11 +86,11 @@ func TestShorten_Http(t *testing.T) {
 	longURL := "https://google.com"
 	requestBody := []byte(`{"long_url": "` + longURL + `"}`)
 
-	req, err := http.NewRequest(http.MethodPost, shortenURL, bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest(http.MethodPost, config.API.Shorten, bytes.NewBuffer(requestBody))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	server := NewServer(serv)
+	server := NewServer(serv, config)
 
 	rr := httptest.NewRecorder()
 	server.handlerShorten(rr, req)
@@ -101,14 +109,14 @@ func TestResolve_Http(t *testing.T) {
 
 	hash := "1234567890"
 
-	req, err := http.NewRequest(http.MethodGet, resolveURL+"/"+hash, nil)
+	req, err := http.NewRequest(http.MethodGet, config.API.Resolve+"/"+hash, nil)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	server := NewServer(serv)
+	server := NewServer(serv, config)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(paramResolveURL, server.handlerResolve)
+	mux.HandleFunc(config.API.Resolve+"/{hash}", server.handlerResolve)
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
@@ -122,14 +130,14 @@ func TestStat_Http(t *testing.T) {
 
 	hash := "1234567890"
 
-	req, err := http.NewRequest(http.MethodGet, statURL+"/"+hash, nil)
+	req, err := http.NewRequest(http.MethodGet, config.API.Stat+"/"+hash, nil)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	server := NewServer(serv)
+	server := NewServer(serv, config)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(paramStatURL, server.handlerStat)
+	mux.HandleFunc(config.API.Stat+"/{hash}", server.handlerStat)
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)

@@ -1,43 +1,35 @@
-package http
+package delivery
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"shorty/internal/configuration"
 	"shorty/internal/domain"
 	"strconv"
 )
 
-const address string = "http://localhost"
-const port string = ":8000"
-const endpoint string = address + port
-
-const shortenURL string = "/api/v1/shorten"
-
-const resolveURL string = "/r"
-const paramResolveURL string = resolveURL + "/{hash}"
-
-const statURL string = "/api/v1/stats"
-const paramStatURL string = statURL + "/{hash}"
-
 type server struct {
-	service domain.URLService
+	service  domain.URLService
+	config   *configuration.HttpConfig
+	endpoint string
 }
 
-func NewServer(service domain.URLService) *server {
+func NewServer(service domain.URLService, config *configuration.HttpConfig) *server {
 	return &server{
 		service: service,
+		config:  config,
 	}
 }
 
-func (c *server) Listen() {
+func (c *server) Listen() error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST "+shortenURL, c.handlerShorten)
-	mux.HandleFunc("GET "+paramResolveURL, c.handlerResolve)
-	mux.HandleFunc("GET "+paramStatURL, c.handlerStat)
+	mux.HandleFunc("POST "+c.config.API.Shorten, c.handlerShorten)
+	mux.HandleFunc("GET "+c.config.API.Resolve+"/{hash}", c.handlerResolve)
+	mux.HandleFunc("GET "+c.config.API.Stat+"/{hash}", c.handlerStat)
 
-	http.ListenAndServe(port, mux)
+	return http.ListenAndServe(":"+c.config.Port, mux)
 }
 
 func (c *server) handlerShorten(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +51,7 @@ func (c *server) handlerShorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]string{
-		"short_url": endpoint + "/r/" + hash,
+		"short_url": c.config.Address + ":" + c.config.Port + "/r/" + hash,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
