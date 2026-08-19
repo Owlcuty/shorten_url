@@ -40,6 +40,8 @@ func (m *mockService) GetLink(ctx context.Context, hash string) (string, error) 
 	return m.getGetLinkFunc(ctx, hash)
 }
 
+func (m *mockService) Stop() {}
+
 func listener(s *server) {
 	s.Listen()
 

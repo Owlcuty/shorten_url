@@ -17,6 +17,7 @@ type RedisCache struct {
 func NewRedisClient(ctx context.Context, cfg *repository.Credentials) (*RedisCache, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.Address,
+		Username: cfg.User,
 		Password: cfg.Password,
 		DB:       cfg.DB,
 	})
@@ -93,4 +94,8 @@ func (r *RedisCache) Save(ctx context.Context, url *domain.URL) error {
 
 func (r *RedisCache) IncrementRedirects(ctx context.Context, hash string) error {
 	return r.client.Incr(ctx, "redirects:"+hash).Err()
+}
+
+func (r *RedisCache) Close() {
+	r.client.Close()
 }

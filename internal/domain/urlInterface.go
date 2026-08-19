@@ -8,6 +8,7 @@ type URLRepository interface {
 	Save(ctx context.Context, url *URL) error
 	GetByHash(ctx context.Context, hash string) (*URL, error)
 	IncrementRedirects(ctx context.Context, hash string) error
+	Close()
 }
 
 type URLService interface {

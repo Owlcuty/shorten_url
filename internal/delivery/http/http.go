@@ -86,7 +86,7 @@ func (c *server) handlerStat(w http.ResponseWriter, r *http.Request) {
 	hash := r.PathValue("hash")
 
 	url, err := c.service.GetURL(ctx, hash)
-	if err != nil {
+	if err != nil || url == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
