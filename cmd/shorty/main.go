@@ -56,7 +56,8 @@ func preparePostgresDB(ctx context.Context, cfg *configuration.DatabaseConfig, c
 	log.Printf("preparePostgresDB for %s", cfg.Address)
 	db, err := postgres.NewConnection(ctx, cfg, cleanupPeriod)
 	if err != nil {
-		log.Fatalf("failed to start postgres connection: %v", err)
+		log.Printf("failed to start postgres connection: %v", err)
+		return nil
 	}
 	postgres.CreateBaseIfNotExist(ctx, db)
 	return db
@@ -65,7 +66,8 @@ func preparePostgresDB(ctx context.Context, cfg *configuration.DatabaseConfig, c
 func prepareRedisCache(ctx context.Context, cfg *configuration.CacheConfig) domain.URLRepository {
 	cache, err := redis.NewRedisClient(ctx, cfg)
 	if err != nil {
-		log.Fatalf("failed to start new redis client: %v", err)
+		log.Printf("failed to start new redis client: %v", err)
+		return nil
 	}
 	return cache
 }

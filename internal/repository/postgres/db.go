@@ -46,7 +46,28 @@ func NewConnection(ctx context.Context, cfg *configuration.DatabaseConfig, clean
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect postgres %s: %w", cfg.Address, err)
 	}
-	if err := c.Ping(ctx); err != nil {
+
+	const maxTries = 5
+	const delay = time.Second
+
+	for i := 0; i < maxTries; i++ {
+		pingCtx, cancel := context.WithTimeout(ctx, delay)
+		err = c.Ping(pingCtx)
+		cancel()
+
+		if err == nil {
+			fmt.Println("Successful connect to db")
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			c.Close()
+			return nil, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+	if err != nil {
 		return nil, fmt.Errorf("failed to create connection for %s: %w", cfg.Address, err)
 	}
 	conn := &connection{conn: c, stopCleanup: make(chan struct{})}

@@ -4,15 +4,15 @@
       "type": "postgres",
       "username": "shorty_user",
       "password": "shorty_pass",
-      "address": "localhost",
-      "port": "5433",
+      "address": "postgres_db",
+      "port": "5432", 
       "database_name": "shorty_db"
     },
     "cache": {
       "type": "redis",
       "username": "",
       "password": "",
-      "address": "localhost",
+      "address": "redis_cache", 
       "port": "6379"
     }
   },
