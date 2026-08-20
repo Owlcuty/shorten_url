@@ -1,0 +1,33 @@
+{
+    "repository": {
+      "database": {
+        "type": "postgres",
+        "username": "shorty_user",
+        "password": "shorty_pass",
+        "address": "localhost",
+        "port": "5433",
+        "database_name": "shorty_db"
+      },
+      "cache": {
+        "type": "redis",
+        "username": "",
+        "password": "",
+        "address": "localhost",
+        "port": "6379"
+      }
+    },
+    "http": {
+      "address": "http://localhost",
+      "port": "8000",
+      "api": {
+        "shorten_post": "/api/v1/shorten",
+        "resolve_get": "/r",
+        "stat_get": "/api/v1/stats"
+      }
+    },
+    "hasher": {
+      "Generator": "murmur",
+      "Encoder": "base62"
+    }
+  }
+  

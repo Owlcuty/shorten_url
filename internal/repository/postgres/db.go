@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"shorty/internal/configuration"
 	"shorty/internal/domain"
-	"shorty/internal/repository"
 	"sync"
 	"time"
 
@@ -35,14 +35,14 @@ func startWatchExpired(c *connection, period time.Duration) {
 	})
 }
 
-func buildConnectionStr(cfg *repository.Credentials, dbName string) string {
-	connstr := "postgres://" + cfg.User + ":" + cfg.Password + "@" + cfg.Address + "/" + dbName + "?sslmode=disable"
+func buildConnectionStr(cfg *configuration.DatabaseConfig) string {
+	connstr := "postgres://" + cfg.User + ":" + cfg.Password + "@" + cfg.Address + ":" + cfg.Port + "/" + cfg.DatabaseName + "?sslmode=disable"
 	log.Printf("Connection string: %s", connstr)
 	return connstr
 }
 
-func NewConnection(ctx context.Context, cfg *repository.Credentials, dbName string, cleanupPeriod time.Duration) (*connection, error) {
-	c, err := pgxpool.New(ctx, buildConnectionStr(cfg, dbName))
+func NewConnection(ctx context.Context, cfg *configuration.DatabaseConfig, cleanupPeriod time.Duration) (*connection, error) {
+	c, err := pgxpool.New(ctx, buildConnectionStr(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect postgres %s: %w", cfg.Address, err)
 	}
@@ -83,8 +83,8 @@ func (c *connection) Save(ctx context.Context, url *domain.URL) error {
 								VALUES ($1, $2, $3, $4, $5)
 								ON CONFLICT (hash) DO UPDATE
 								SET hash = EXCLUDED.hash
-								RETURNING id`,
-		url.LongURL, url.Hash, url.Redirects, url.CreatedAt, url.ExpiresAt).Scan(&url.ID)
+								RETURNING id, redirects`,
+		url.LongURL, url.Hash, url.Redirects, url.CreatedAt, url.ExpiresAt).Scan(&url.ID, &url.Redirects)
 
 	if err != nil {
 		return fmt.Errorf("failed to save {%s || %s}: %w", url.Hash, url.LongURL, err)
@@ -118,5 +118,8 @@ func (c *connection) IncrementRedirects(ctx context.Context, hash string) error 
 }
 
 func (c *connection) deleteExpired(ctx context.Context) {
-	c.conn.Exec(ctx, "DELETE FROM urls WHERE expires_at < NOW()")
+	_, err := c.conn.Exec(ctx, "DELETE FROM urls WHERE expires_at < NOW()")
+	if err != nil {
+		log.Printf("Error: failed to delete expired urls from DB: %v", err)
+	}
 }

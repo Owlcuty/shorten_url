@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"shorty/internal/configuration"
 	"shorty/internal/repository"
 	"testing"
 
@@ -27,9 +28,8 @@ func prepareClient(t *testing.T, ctx context.Context) *RedisCache {
 	endpoint, err := redisCont.Endpoint(ctx, "")
 	require.NoError(t, err)
 
-	client, err := NewRedisClient(ctx, &repository.Credentials{
+	client, err := NewRedisClient(ctx, &configuration.CacheConfig{
 		Address: endpoint,
-		DB:      db,
 	})
 	require.NoError(t, err)
 
