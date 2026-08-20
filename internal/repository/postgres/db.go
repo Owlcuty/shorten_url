@@ -83,8 +83,8 @@ func (c *connection) Save(ctx context.Context, url *domain.URL) error {
 								VALUES ($1, $2, $3, $4, $5)
 								ON CONFLICT (hash) DO UPDATE
 								SET hash = EXCLUDED.hash
-								RETURNING id`,
-		url.LongURL, url.Hash, url.Redirects, url.CreatedAt, url.ExpiresAt).Scan(&url.ID)
+								RETURNING id, redirects`,
+		url.LongURL, url.Hash, url.Redirects, url.CreatedAt, url.ExpiresAt).Scan(&url.ID, &url.Redirects)
 
 	if err != nil {
 		return fmt.Errorf("failed to save {%s || %s}: %w", url.Hash, url.LongURL, err)
@@ -118,5 +118,8 @@ func (c *connection) IncrementRedirects(ctx context.Context, hash string) error 
 }
 
 func (c *connection) deleteExpired(ctx context.Context) {
-	c.conn.Exec(ctx, "DELETE FROM urls WHERE expires_at < NOW()")
+	_, err := c.conn.Exec(ctx, "DELETE FROM urls WHERE expires_at < NOW()")
+	if err != nil {
+		log.Printf("Error: failed to delete expired urls from DB: %v", err)
+	}
 }

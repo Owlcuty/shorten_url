@@ -24,3 +24,11 @@ func ParseFile(filename string) (*Config, error) {
 	defer file.Close()
 	return Parse(file)
 }
+
+func (c *Config) Validate() error {
+	if c.Http.Port == "" {
+		return fmt.Errorf("http.port is required")
+	}
+	// TODO: add required
+	return nil
+}

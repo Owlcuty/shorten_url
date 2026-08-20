@@ -95,13 +95,20 @@ func main() {
 	db := prepareDBByConfig(ctx, &config.Repo.DB)
 	if db != nil {
 		defer db.Close()
+	} else {
+		log.Println("Warning: no DB in use")
 	}
 
 	cache := prepareCacheByConfig(ctx, &config.Repo.Cache)
 	if cache != nil {
 		defer cache.Close()
+	} else {
+		log.Println("Warning: no Cache in use")
 	}
 
+	if db == nil && cache == nil {
+		log.Fatal("Missing both DB and Cache. Can't work without database. Check configuration or connection")
+	}
 	serv := prepareService(db, cache, hasher)
 	go serv.Run(ctx)
 	defer serv.Stop()

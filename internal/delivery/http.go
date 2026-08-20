@@ -10,9 +10,8 @@ import (
 )
 
 type server struct {
-	service  domain.URLService
-	config   *configuration.HttpConfig
-	endpoint string
+	service domain.URLService
+	config  *configuration.HttpConfig
 }
 
 func NewServer(service domain.URLService, config *configuration.HttpConfig) *server {

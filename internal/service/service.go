@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"shorty/internal/domain"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ type urlService struct {
 	tools          *domain.Tools
 	RedirectLinkCh chan string
 	wg             sync.WaitGroup
+	stopOnce       sync.Once
 }
 
 func New(tools *domain.Tools) *urlService {
@@ -23,13 +25,18 @@ func (s *urlService) Run(ctx context.Context) {
 	defer s.wg.Done()
 
 	for hash := range s.RedirectLinkCh {
-		_ = s.incrRedirects(ctx, hash)
+		err := s.incrRedirects(ctx, hash)
+		if err != nil {
+			log.Printf("Warning: %v", err)
+		}
 	}
 }
 
 func (s *urlService) Stop() {
-	close(s.RedirectLinkCh)
-	s.wg.Wait()
+	s.stopOnce.Do(func() {
+		close(s.RedirectLinkCh)
+		s.wg.Wait()
+	})
 }
 
 func (s *urlService) Shorten(ctx context.Context, longURL string, ttlDays int) (string, error) {
@@ -49,7 +56,8 @@ func (s *urlService) Shorten(ctx context.Context, longURL string, ttlDays int) (
 	}
 	now := time.Now().UTC().Truncate(time.Second)
 	ttl := ttlDays
-	if ttl == 0 {
+	if ttl <= 0 {
+		log.Printf("TTL was set <= 0: %d; time to live is set to 30 days", ttl)
 		ttl = 30
 	}
 	// Form url and save
@@ -57,7 +65,7 @@ func (s *urlService) Shorten(ctx context.Context, longURL string, ttlDays int) (
 		LongURL:   longURL,
 		Hash:      hash,
 		CreatedAt: now,
-		ExpiresAt: now.Add(24 * time.Duration(ttlDays) * time.Hour),
+		ExpiresAt: now.Add(24 * time.Duration(ttl) * time.Hour),
 	}
 	err = s.save(ctx, url)
 
@@ -98,7 +106,7 @@ func (s *urlService) GetURL(ctx context.Context, hash string) (*domain.URL, erro
 
 func (s *urlService) GetLink(ctx context.Context, hash string) (string, error) {
 	url, err := s.GetURL(ctx, hash)
-	if err != nil {
+	if err != nil || url == nil {
 		return "", fmt.Errorf("failed to get url for %s: %w", hash, err)
 	}
 
@@ -122,11 +130,14 @@ func (s *urlService) incrRedirects(ctx context.Context, hash string) error {
 	if s.tools.Cache != nil {
 		err := s.tools.Cache.IncrementRedirects(ctx, hash)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to increment cache's redirections for %s: %w", hash, err)
 		}
 	}
 	if s.tools.DB != nil {
-		return s.tools.DB.IncrementRedirects(ctx, hash)
+		err := s.tools.DB.IncrementRedirects(ctx, hash)
+		if err != nil {
+			return fmt.Errorf("failed to increment DB's redirections for %s: %w", hash, err)
+		}
 	}
 	return nil
 }

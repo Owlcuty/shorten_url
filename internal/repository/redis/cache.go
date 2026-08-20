@@ -59,7 +59,7 @@ func (r *RedisCache) GetByHash(ctx context.Context, hash string) (*domain.URL, e
 		}
 	}
 
-	return url, err
+	return url, nil
 }
 
 func (r *RedisCache) Save(ctx context.Context, url *domain.URL) error {
